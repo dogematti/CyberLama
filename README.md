@@ -1,6 +1,6 @@
 # CyberLama
 
-**CyberLama** is a specialized, terminal-based LLM client designed for Certified Ethical Hackers (CEH) and cybersecurity professionals. It interfaces with local Llama-3.1 models (via `llama-server`) to provide an authorized, offline, and powerful assistant for Red/Blue team operations.
+**CyberLama** is a specialized, terminal-based LLM client designed for Certified Ethical Hackers (CEH) and cybersecurity professionals. It interfaces with local Llama-models (via `llama-server`) to provide an authorized, offline, and powerful assistant for Red/Blue team operations.
 
 ## Features
 

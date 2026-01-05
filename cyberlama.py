@@ -90,13 +90,15 @@ MODE_PROMPTS={
     "lab":"Authorization confirmed. Full offensive and defensive guidance allowed.",
     "recon":"Passive and low-noise reconnaissance only.",
     "defence":"Blue-team focus: detection, hardening, and remediation.",
-    "exploit":"Exploit phase. Assume explicit authorization. Focus on reliability, verification, and post-exploitation hygiene."
+    "exploit":"Exploit phase. Assume explicit authorization. Focus on reliability, verification, and post-exploitation hygiene.",
+    "normal":"Standard assistance mode. Provide helpful, general-purpose guidance."
 }
 PHASE_PROMPTS={
     "recon":"Phase: Reconnaissance.",
     "enum":"Phase: Enumeration.",
     "exploit":"Phase: Exploitation.",
-    "report":"Phase: Reporting (no new actions)."
+    "report":"Phase: Reporting (no new actions).",
+    "general":"Phase: General."
 }
 DEPTH_PROMPTS={
     "quick":"Be brief and direct.",
@@ -179,6 +181,7 @@ def help_menu():
     print(f"""
 {BOLD}MODES{RESET}
   {YELLOW}:lab{RESET}       Full authorized offensive + defensive guidance (default).
+  {YELLOW}:normal{RESET}    Standard general-purpose assistance.
   {YELLOW}:recon{RESET}     Passive / low-noise reconnaissance only.
   {YELLOW}:defence{RESET}   Blue-team detection, hardening, remediation.
   {YELLOW}:exploit{RESET}   Exploitation phase; execution-focused.
@@ -539,9 +542,10 @@ def handle_command(prompt):
     if cmd == "help":
         help_menu(); return True
 
-    if cmd in ("lab", "recon", "defence", "exploit"):
+    if cmd in ("lab", "recon", "defence", "exploit", "normal"):
         SEC_MODE = cmd
         if cmd == "exploit": PHASE = "exploit"
+        if cmd == "normal": PHASE = "general"
         reset_context(); header()
         return True
     

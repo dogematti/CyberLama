@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, sys, json, time, requests, signal, readline, atexit, re, difflib, subprocess
+import os, sys, json, time, requests, signal, readline, atexit, re, difflib, subprocess, getpass
 from pathlib import Path
 from datetime import datetime
 
@@ -81,7 +81,7 @@ _SLASH_COMMANDS = (
     ":load :read :diff :copy :compress :export :exec :run :set :remember "
     ":memory :status :reset :continue :tools :recall :retry :engage "
     ":engagements :scan :web :dns :flow :flows :bg :target :targets "
-    ":summary :notes :health :env :once :q"
+    ":summary :notes :health :env :taylor :once :q"
 ).split()
 
 
@@ -458,6 +458,7 @@ def help_menu():
   {YELLOW}:status{RESET}            Show mode, phase, depth, tokens, latency.
   {YELLOW}:health{RESET}            Ping the LLM endpoint.
   {YELLOW}:env{RESET}               Show resolved config.
+  {YELLOW}:taylor{RESET}            Switch to the remote tunneled endpoint (prompts for key).
   {YELLOW}:q{RESET}                 Quit CyberLama.
 """)
 
@@ -836,7 +837,7 @@ def stream_completion(msgs):
     return final_text, "tool_calls"
 
 def handle_command(prompt):
-    global SEC_MODE, PHASE, DEPTH, FORMAT, ENGAGEMENT, MEMORY, messages, MODEL, TEMPERATURE, RENDER_MARKDOWN
+    global SEC_MODE, PHASE, DEPTH, FORMAT, ENGAGEMENT, MEMORY, messages, MODEL, TEMPERATURE, RENDER_MARKDOWN, API_URL, API_KEY, CONTEXT_WINDOW
     p = prompt[1:].split()
     cmd = p[0]
     args = p[1:] if len(p) > 1 else []
@@ -1313,6 +1314,21 @@ Speed:{speed:.1f} tok/s
                 print(f"{GREEN if r.ok else RED}[{r.status_code}] {url}{RESET}  {GRAY}{snippet}{RESET}")
             except Exception as e:
                 print(f"{RED}[err] {url}: {e}{RESET}")
+        return True
+
+    # ---- :taylor: switch to the remote tunneled endpoint ----
+    if cmd == "taylor":
+        try:
+            key = getpass.getpass(f"{YELLOW}taylor API key > {RESET}")
+        except (EOFError, KeyboardInterrupt):
+            print(); print(f"{YELLOW}[taylor: cancelled]{RESET}"); return True
+        if not key.strip():
+            print(f"{YELLOW}[taylor: cancelled — empty key]{RESET}"); return True
+        API_URL = "https://cyberlama-d33f4393.tunn.dev/v1/chat/completions"
+        API_KEY = key.strip()
+        CONTEXT_WINDOW = 16384
+        print(f"{GREEN}[taylor: pointed at cyberlama-d33f4393.tunn.dev, ctx 16384]{RESET}")
+        header()
         return True
 
     # ---- Show resolved config ----

@@ -4,3 +4,6 @@ __pycache__/
 .venv/
 venv/
 .DS_Store
+
+# Contains a real API key — keep out of git.
+Caddyfile

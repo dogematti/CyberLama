@@ -128,6 +128,12 @@ BLUE="\033[34m"; MAGENTA="\033[35m"; CYAN="\033[36m"; GRAY="\033[90m"
 def ts():
     return datetime.now().strftime("%H:%M:%S")
 
+
+def _rl(s):
+    """Wrap ANSI escapes so readline doesn't count them as visible chars.
+    Without this, long input lines wrap to column 0 instead of past the prompt."""
+    return f"\001{s}\002"
+
 # ================= STATE =================
 SEC_MODE="lab"          # lab | recon | defence | exploit
 DEPTH="normal"          # quick | normal | deep
@@ -1358,8 +1364,13 @@ header()
 # ================= LOOP =================
 while True:
     try:
-        prompt_text = input(f"{BLUE}{BOLD}{USER_NAME}{RESET}@{MAGENTA}{ASSISTANT_NAME}{RESET} "
-                            f"{GRAY}[{ts()}]{RESET} {BLUE}>{RESET} {CYAN}").strip()
+        prompt_text = input(
+            f"{_rl(BLUE+BOLD)}{USER_NAME}{_rl(RESET)}@"
+            f"{_rl(MAGENTA)}{ASSISTANT_NAME}{_rl(RESET)} "
+            f"{_rl(GRAY)}[{ts()}]{_rl(RESET)} "
+            f"{_rl(BLUE)}>{_rl(RESET)} "
+            f"{_rl(CYAN)}"
+        ).strip()
         print(RESET, end="", flush=True)
     except (EOFError, KeyboardInterrupt):
         print(f"{RESET}\nbye"); break

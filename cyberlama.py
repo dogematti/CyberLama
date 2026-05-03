@@ -1330,10 +1330,10 @@ Speed:{speed:.1f} tok/s
             print(); print(f"{YELLOW}[taylor: cancelled]{RESET}"); return True
         if not key.strip():
             print(f"{YELLOW}[taylor: cancelled — empty key]{RESET}"); return True
-        API_URL = "https://cyberlama-d33f4393.tunn.dev/v1/chat/completions"
+        API_URL = "https://cyberlama.tunn.dev/v1/chat/completions"
         API_KEY = key.strip()
         CONTEXT_WINDOW = 16384
-        print(f"{GREEN}[taylor: pointed at cyberlama-d33f4393.tunn.dev, ctx 16384]{RESET}")
+        print(f"{GREEN}[taylor: pointed at cyberlama.tunn.dev, ctx 16384]{RESET}")
         header()
         return True
 

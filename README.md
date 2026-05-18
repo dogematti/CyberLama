@@ -31,12 +31,14 @@ Python 3.10+. Optional clipboard helper on Linux: `xclip`, `xsel`, or `wl-copy`.
 
 ```bash
 llama-server \
-  -m ./your-model.gguf \
+  -m ./gemma-4-31B-it-uncensored-Q8_0.gguf \
   -c 16384 -ngl 999 \
-  --host 0.0.0.0 --port 8080 --jinja
+  --host 127.0.0.1 --port 8080 --jinja
 ```
 
 `--jinja` enables the model's chat template — this is what makes `llama-server` emit native OpenAI-style `tool_calls`. If the model/template doesn't expose tools, CyberLama's prompt-based fallback (`<tool_call>{...}</tool_call>` blocks) handles it.
+
+The llama.cpp server binary is normally `llama-server`; if your install exposes it as `lama-server`, use that binary name with the same flags.
 
 Then in another terminal:
 
@@ -51,20 +53,20 @@ Env vars take precedence over `~/.cyberlama/config.json` over defaults.
 | Env Variable | Default | Description |
 | :--- | :--- | :--- |
 | `CYBERLAMA_API_URL` | `http://localhost:8080/v1/chat/completions` | API endpoint |
-| `CYBERLAMA_MODEL` | `SecurityLLM-Q5-K-M.gguf` | Model name sent to the server |
+| `CYBERLAMA_MODEL` | `gemma-4-31B-it-uncensored-Q8_0.gguf` | Model name sent to the server |
 | `CYBERLAMA_TEMP` | `0.2` | Sampling temperature |
 | `CYBERLAMA_RENDER` | `true` | Render assistant output as Markdown (needs `rich`) |
 | `CYBERLAMA_TOOLS` | `true` | Expose function tools to the model |
 | `CYBERLAMA_AUTO_COMPRESS` | `true` | Auto-summarize history when context fills |
 | `CYBERLAMA_AUTO_RUN_SHELL` | `true` | Auto-route literal allowlisted commands to `:run` |
-| `CYBERLAMA_CONTEXT_WINDOW` | `8192` | Token budget for ctx meter / auto-compress trigger |
+| `CYBERLAMA_CONTEXT_WINDOW` | `16384` | Token budget for ctx meter / auto-compress trigger |
 | `CYBERLAMA_API_KEY` | *(optional)* | Only needed if your endpoint enforces auth |
 
 `~/.cyberlama/config.json` example:
 ```json
 {
-  "api_url": "http://10.0.0.5:8080/v1/chat/completions",
-  "model": "gemma-4-31B-it-UD-Q8_K_XL.gguf",
+  "api_url": "http://127.0.0.1:8080/v1/chat/completions",
+  "model": "gemma-4-31B-it-uncensored-Q8_0.gguf",
   "temp": 0.3,
   "tools": true,
   "context_window": 16384
@@ -156,6 +158,7 @@ Saved targets get injected into the system prompt as `Known targets:` lines, so 
 | `:env` | Show resolved config. |
 | `:status` | Mode, phase, depth, latency, tokens/sec. |
 | `:set temp 0.7` | Live-tune temperature, model, render. |
+| `:taylor` | Switch to the Taylor remote endpoint using the default Gemma model and 16k context. |
 | `:diff a.txt b.txt` | Diff two files (or file-vs-last-codeblock with one arg). |
 | `:copy [n]` | Copy code block #n to clipboard. |
 | `:compress` | Manually summarize older history. |

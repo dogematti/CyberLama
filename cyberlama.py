@@ -32,6 +32,11 @@ CONFIG_FILE = BASE_DIR / "config.json"
 TARGETS_FILE = BASE_DIR / "targets.json"
 BG_DIR = BASE_DIR / "bg_tasks"
 
+DEFAULT_API_URL = "http://localhost:8080/v1/chat/completions"
+DEFAULT_MODEL = "gemma-4-31B-it-uncensored-Q8_0.gguf"
+DEFAULT_CONTEXT_WINDOW = 16384
+TAYLOR_API_URL = "https://cyberlama.tunn.dev/v1/chat/completions"
+
 BASE_DIR.mkdir(exist_ok=True)
 ENG_DIR.mkdir(exist_ok=True)
 TEMPLATES_DIR.mkdir(exist_ok=True)
@@ -52,14 +57,14 @@ def _cfg(key: str, default):
         return env
     return _FILE_CFG.get(key, default)
 
-API_URL = _cfg("api_url", "http://localhost:8080/v1/chat/completions")
-MODEL = _cfg("model", "SecurityLLM-Q5-K-M.gguf")
+API_URL = _cfg("api_url", DEFAULT_API_URL)
+MODEL = _cfg("model", DEFAULT_MODEL)
 TEMPERATURE = float(_cfg("temp", 0.2))
 RENDER_MARKDOWN = str(_cfg("render", "true")).lower() == "true"
 TOOLS_ENABLED = str(_cfg("tools", "true")).lower() == "true"
 AUTO_COMPRESS = str(_cfg("auto_compress", "true")).lower() == "true"
 AUTO_RUN_SHELL = str(_cfg("auto_run_shell", "true")).lower() == "true"
-CONTEXT_WINDOW = int(_cfg("context_window", 8192))
+CONTEXT_WINDOW = int(_cfg("context_window", DEFAULT_CONTEXT_WINDOW))
 
 MAX_TURNS = 12
 AUTO_CONTINUE_LIMIT = 2
@@ -464,7 +469,7 @@ def help_menu():
   {YELLOW}:status{RESET}            Show mode, phase, depth, tokens, latency.
   {YELLOW}:health{RESET}            Ping the LLM endpoint.
   {YELLOW}:env{RESET}               Show resolved config.
-  {YELLOW}:taylor{RESET}            Switch to the remote tunneled endpoint (prompts for key).
+  {YELLOW}:taylor{RESET}            Switch to the remote tunneled endpoint (default Gemma, prompts for key).
   {YELLOW}:q{RESET}                 Quit CyberLama.
 """)
 
@@ -1330,10 +1335,11 @@ Speed:{speed:.1f} tok/s
             print(); print(f"{YELLOW}[taylor: cancelled]{RESET}"); return True
         if not key.strip():
             print(f"{YELLOW}[taylor: cancelled — empty key]{RESET}"); return True
-        API_URL = "https://cyberlama.tunn.dev/v1/chat/completions"
+        API_URL = TAYLOR_API_URL
         API_KEY = key.strip()
-        CONTEXT_WINDOW = 16384
-        print(f"{GREEN}[taylor: pointed at cyberlama.tunn.dev, ctx 16384]{RESET}")
+        MODEL = DEFAULT_MODEL
+        CONTEXT_WINDOW = DEFAULT_CONTEXT_WINDOW
+        print(f"{GREEN}[taylor: pointed at cyberlama.tunn.dev, model {MODEL}, ctx {CONTEXT_WINDOW}]{RESET}")
         header()
         return True
 

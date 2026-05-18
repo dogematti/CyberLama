@@ -62,6 +62,9 @@ MODEL = _cfg("model", DEFAULT_MODEL)
 TEMPERATURE = float(_cfg("temp", 0.2))
 RENDER_MARKDOWN = str(_cfg("render", "true")).lower() == "true"
 TOOLS_ENABLED = str(_cfg("tools", "true")).lower() == "true"
+TOOL_RESULT_PROTOCOL = str(_cfg("tool_result_protocol", "text")).lower()
+if TOOL_RESULT_PROTOCOL not in {"text", "native"}:
+    TOOL_RESULT_PROTOCOL = "text"
 AUTO_COMPRESS = str(_cfg("auto_compress", "true")).lower() == "true"
 AUTO_RUN_SHELL = str(_cfg("auto_run_shell", "true")).lower() == "true"
 CONTEXT_WINDOW = int(_cfg("context_window", DEFAULT_CONTEXT_WINDOW))
@@ -78,7 +81,18 @@ try:
     readline.read_history_file(HISTORY_FILE)
 except FileNotFoundError:
     pass
-atexit.register(readline.write_history_file, HISTORY_FILE)
+except OSError:
+    pass
+
+
+def _save_readline_history():
+    try:
+        readline.write_history_file(HISTORY_FILE)
+    except OSError:
+        pass
+
+
+atexit.register(_save_readline_history)
 
 # Tab completion for slash commands, engagements, templates, targets.
 _SLASH_COMMANDS = (
@@ -574,6 +588,77 @@ def _merge_tool_call_delta(acc, delta_calls):
             slot["function"]["arguments"] += fn["arguments"]
 
 
+def _normalize_tool_calls(tool_calls):
+    """Return schema-stable tool calls with non-empty ids and string args.
+
+    Some OpenAI-compatible local servers stream function calls without an id,
+    or with arguments already decoded. Sending those straight back as native
+    tool messages can make the follow-up request fail or hang in the template.
+    """
+    normalized = []
+    for i, tc in enumerate(tool_calls or []):
+        fn = tc.get("function") or {}
+        name = str(fn.get("name") or "").strip()
+        if not name:
+            continue
+
+        args = fn.get("arguments", "{}")
+        if isinstance(args, dict):
+            args = json.dumps(args)
+        elif args is None:
+            args = "{}"
+        elif not isinstance(args, str):
+            args = json.dumps(args)
+
+        call_id = str(tc.get("id") or "").strip()
+        if not call_id:
+            safe_name = re.sub(r"\W+", "_", name).strip("_") or "tool"
+            call_id = f"call_{i}_{safe_name}"
+
+        normalized.append({
+            "id": call_id,
+            "type": tc.get("type") or "function",
+            "function": {
+                "name": name,
+                "arguments": args,
+            },
+        })
+    return normalized
+
+
+def _tool_call_text(tc):
+    fn = tc.get("function") or {}
+    raw_args = fn.get("arguments", "{}") or "{}"
+    try:
+        parsed_args = json.loads(raw_args)
+    except json.JSONDecodeError:
+        parsed_args = {"raw": raw_args}
+    if not isinstance(parsed_args, dict):
+        parsed_args = {"raw": raw_args}
+    payload = {"name": fn.get("name", ""), "arguments": parsed_args}
+    return f"<tool_call>{json.dumps(payload, separators=(',', ':'))}</tool_call>"
+
+
+def _tool_result_text(name, result):
+    return f'<tool_result name="{name}">\n{result}\n</tool_result>'
+
+
+def _is_text_tool_result(msg):
+    return (
+        msg.get("role") == "user"
+        and (msg.get("content") or "").lstrip().startswith("<tool_result")
+    )
+
+
+def _has_recent_tool_result(msgs, lookback=6):
+    for m in msgs[-lookback:]:
+        if m.get("role") == "tool":
+            return True
+        if _is_text_tool_result(m):
+            return True
+    return False
+
+
 def _stream_one(msgs):
     """Stream one assistant turn. Returns (text, tool_calls, finish_reason)."""
     global last_latency, last_prompt_tokens, last_completion_tokens, last_finish_reason, CODE_BLOCKS
@@ -802,9 +887,16 @@ def stream_completion(msgs):
             if text_calls:
                 tool_calls = text_calls
                 text_based = True
+        if tool_calls:
+            tool_calls = _normalize_tool_calls(tool_calls)
+        text_protocol = bool(tool_calls) and (text_based or TOOL_RESULT_PROTOCOL != "native")
 
-        am: dict = {"role": "assistant", "content": text or None}
-        if tool_calls and not text_based:
+        assistant_text = text or ""
+        if tool_calls and text_protocol and not assistant_text.strip():
+            assistant_text = "\n".join(_tool_call_text(tc) for tc in tool_calls)
+
+        am: dict = {"role": "assistant", "content": assistant_text}
+        if tool_calls and not text_protocol:
             am["tool_calls"] = tool_calls
         msgs.append(am)
         final_text = text
@@ -831,19 +923,20 @@ def stream_completion(msgs):
             result = tools_mod.execute(name, args)
             preview = result if len(result) < 800 else result[:800] + "..."
             print(f"{DIM}{preview}{RESET}")
-            if text_based:
+            if text_protocol:
                 # Inject as a user-role message so any chat template handles it.
                 msgs.append({
                     "role": "user",
-                    "content": f'<tool_result name="{name}">\n{result}\n</tool_result>',
+                    "content": _tool_result_text(name, result),
                 })
             else:
                 msgs.append({
                     "role": "tool",
-                    "tool_call_id": tc.get("id") or name,
+                    "tool_call_id": tc["id"],
                     "name": name,
                     "content": result,
                 })
+        print(f"{DIM}[sent tool result to model]{RESET}")
     print(f"\n{YELLOW}[tool loop limit reached at {TOOL_LOOP_LIMIT} rounds]{RESET}")
     return final_text, "tool_calls"
 
@@ -989,7 +1082,10 @@ def handle_command(prompt):
 
     if cmd == "retry":
         # Drop the last assistant turn (and any tool messages following it) and regenerate.
-        while messages and messages[-1]["role"] in ("assistant", "tool"):
+        while messages and (
+            messages[-1]["role"] in ("assistant", "tool")
+            or _is_text_tool_result(messages[-1])
+        ):
             messages.pop()
         if not messages or messages[-1]["role"] != "user":
             print(f"{YELLOW}Nothing to retry.{RESET}"); return True
@@ -1349,6 +1445,7 @@ Speed:{speed:.1f} tok/s
         for k, v in [
             ("API_URL", API_URL), ("MODEL", MODEL), ("API_KEY", "(set)" if API_KEY else "(none)"),
             ("TEMPERATURE", TEMPERATURE), ("RENDER_MARKDOWN", RENDER_MARKDOWN),
+            ("TOOL_RESULT_PROTOCOL", TOOL_RESULT_PROTOCOL),
             ("TOOLS_ENABLED", TOOLS_ENABLED), ("AUTO_COMPRESS", AUTO_COMPRESS),
             ("AUTO_RUN_SHELL", AUTO_RUN_SHELL), ("CONTEXT_WINDOW", CONTEXT_WINDOW),
             ("ENGAGEMENT", ENGAGEMENT), ("BASE_DIR", str(BASE_DIR)),
@@ -1434,7 +1531,7 @@ while True:
         # If the model lectured instead of acting, suggest the escape hatch.
         if (TOOLS_ENABLED and len((content or "").strip()) > 200
                 and _looks_actionable(last_user_before)
-                and not any(m.get("role") == "tool" for m in msgs_to_send[-4:])):
+                and not _has_recent_tool_result(msgs_to_send)):
             print(f"{DIM}tip: this model won't tool-call. Try `:run <cmd>` "
                   f"to execute directly, then ask for analysis.{RESET}")
 

@@ -57,6 +57,7 @@ Env vars take precedence over `~/.cyberlama/config.json` over defaults.
 | `CYBERLAMA_TEMP` | `0.2` | Sampling temperature |
 | `CYBERLAMA_RENDER` | `true` | Render assistant output as Markdown (needs `rich`) |
 | `CYBERLAMA_TOOLS` | `true` | Expose function tools to the model |
+| `CYBERLAMA_TOOL_RESULT_PROTOCOL` | `text` | Feed tool results back as `<tool_result>` text (`text`) or OpenAI `tool` role messages (`native`) |
 | `CYBERLAMA_AUTO_COMPRESS` | `true` | Auto-summarize history when context fills |
 | `CYBERLAMA_AUTO_RUN_SHELL` | `true` | Auto-route literal allowlisted commands to `:run` |
 | `CYBERLAMA_CONTEXT_WINDOW` | `16384` | Token budget for ctx meter / auto-compress trigger |
